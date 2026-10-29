@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fafaf8">
+  <meta name="description" content="火石素材库：以影像承载想象，让灵感在每一次创作中发生。探索项目、图片、视频与创作记录。">
+  <title>火石素材库 · 火石 AIGC</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./landing.css">
+  <script src="./landing.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body class="landing-mode">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="huoshi-wordmark" viewBox="225 195 1590 390"><image href="./assets/huoshi-logo.png" width="1983" height="793"/></symbol></defs></svg>
+  <a href="#main" class="skip-link">跳到素材列表</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand huoshi-logo" href="#/home" aria-label="火石 AIGC 首页"><svg viewBox="0 0 1590 390" role="img" aria-label="火石 AIGC"><use href="#huoshi-wordmark"/></svg></a>
+      <nav class="main-nav" aria-label="主导航">
+        <a href="#/home" data-route="home">首页</a>
+        <a href="#/library" data-route="library">火石项目库</a>
+        <a href="#/projects" data-route="projects">项目总管</a>
+        <a href="#/images" data-route="images">图片整理</a>
+        <a href="#/videos" data-route="videos">视频整理</a>
+      </nav>
+      <div class="header-end"><span class="workspace-label"><i></i> 本地工作区</span><button class="button-icon" id="open-logs" aria-label="查看删除日志" title="删除日志"><span data-icon="history"></span></button><button class="avatar" id="workspace-info" aria-label="查看工作区说明">火</button></div>
+    </div>
+  </header>
+  <div id="home-view">
+    <header class="home-header"><nav aria-label="首页导航"><a href="#/home?section=show" data-home-section="show" class="active"><span>01</span>展示</a><a href="#/home?section=show-projects" data-home-section="show-projects"><span>02</span>项目展示</a><a href="#/home?section=show-assets" data-home-section="show-assets"><span>03</span>素材展示</a><a href="#/home?section=show-contact" data-home-section="show-contact"><span>04</span>联系方式</a></nav><div class="home-header-right"><a href="#/library" class="enter-library">进入项目库<span aria-hidden="true">↗</span></a><a href="#/home" class="huoshi-logo" aria-label="火石 AIGC 首页"><svg viewBox="0 0 1590 390" role="img" aria-label="火石 AIGC"><use href="#huoshi-wordmark"/></svg></a></div></header>
+    <main class="home-main">
+      <section class="ink-hero" id="show" aria-labelledby="home-title"><canvas id="ink-canvas" aria-hidden="true"></canvas><div class="hero-title-wrap"><h1 id="home-title">火石素材库</h1></div><div class="hero-corner corner-tl" aria-hidden="true"></div><div class="hero-corner corner-br" aria-hidden="true"></div><a class="hero-scroll" href="#/home?section=show-projects" aria-label="向下查看项目展示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 3v18m-7-7 7 7 7-7"/></svg></a><button class="motion-toggle" id="motion-toggle" aria-label="暂停彩墨动画" title="暂停彩墨动画" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 5v14M16 5v14"/></svg></button></section>
+      <section class="home-section project-showcase" id="show-projects" aria-labelledby="projects-heading"><div class="home-section-header"><div><p class="section-eyebrow"><span>01 /</span> SELECTED PROJECTS</p><h2 id="projects-heading">项目展示<span class="small-orange-dot"></span></h2></div><a class="home-link" href="#/projects">查看全部项目<span>↗</span></a></div><div class="home-project-grid" id="home-projects"></div><p class="showcase-caption" id="project-showcase-note">每个项目，都有自己的表达。</p></section>
+      <section class="home-section material-showcase" id="show-assets" aria-labelledby="materials-heading"><div class="home-section-header"><div><p class="section-eyebrow"><span>02 /</span> CREATIVE MATERIALS</p><h2 id="materials-heading">素材展示<span class="small-orange-dot"></span></h2></div><a class="home-link" href="#/library">探索全部素材<span>↗</span></a></div><div class="home-material-grid" id="home-materials"></div><div class="material-bottom"><p>收集片刻，创作无限。</p><div><a href="#/images">图片整理<span>↗</span></a><a href="#/videos">视频整理<span>↗</span></a></div></div></section>
+      <section class="home-section contact-showcase" id="show-contact" aria-labelledby="contact-heading"><p class="section-eyebrow"><span>03 /</span> STAY IN TOUCH</p><div class="contact-heading-row"><h2 id="contact-heading">联系方式<span class="small-orange-dot"></span></h2><span class="contact-spark" aria-hidden="true">✳</span></div><div class="contact-bottom"><p>下一次灵感，<br>从一次连接开始。</p><div class="social-area"><div class="social-links"><button data-social="抖音" aria-label="抖音，账号待添加"><span class="social-symbol douyin-symbol"><svg viewBox="0 0 32 32" fill="none"><path d="M19 5v16a6 6 0 1 1-6-6m6-10c1 5 4 7 8 7" stroke="#ff3057" stroke-width="3.4" transform="translate(1 1)"/><path d="M19 5v16a6 6 0 1 1-6-6m6-10c1 5 4 7 8 7" stroke="#49b7bb" stroke-width="3.4" transform="translate(-1 -1)"/><path d="M19 5v16a6 6 0 1 1-6-6m6-10c1 5 4 7 8 7" stroke="currentColor" stroke-width="3.4"/></svg></span><span>抖音</span><small>↗</small></button><button data-social="微信" aria-label="微信，账号待添加"><span class="social-symbol"><svg viewBox="0 0 36 32" fill="currentColor"><path d="M14 3C7.4 3 2 7.3 2 12.5c0 3 1.8 5.7 4.6 7.5l-1.1 3.5 4.1-2.1c1.1.3 2.4.5 3.7.6-.5-1.1-.8-2.4-.8-3.6 0-5.3 5.1-9.5 11.5-9.5h1.1C23.3 5.4 19 3 14 3Z"/><path d="M24 10.5c-5.7 0-10.2 3.6-10.2 8s4.5 8 10.2 8c1.3 0 2.5-.2 3.6-.6l3.5 1.9-.9-3c2.4-1.5 4-3.8 4-6.3 0-4.4-4.5-8-10.2-8Z"/><g fill="#f5f4ef"><circle cx="10" cy="10" r="1.5"/><circle cx="18" cy="10" r="1.5"/><circle cx="20.5" cy="16.5" r="1.2"/><circle cx="27.5" cy="16.5" r="1.2"/></g></svg></span><span>微信</span><small>↗</small></button><button data-social="小红书" aria-label="小红书，账号待添加"><span class="social-symbol xhs-symbol" aria-hidden="true">小红书</span><span>小红书</span><small>↗</small></button></div><p class="social-status" id="social-status" role="status">社交账号待添加</p></div></div></section>
+    </main><footer class="home-footer"><a href="#/home" class="footer-huoshi">火石 <span>AIGC</span></a><span>灵感有迹，创作无界。</span><a href="#/home?section=show">回到顶部 ↑</a></footer>
+  </div>
+  <button class="sidebar-handle" id="sidebar-toggle" aria-label="展开标签侧栏" aria-controls="tag-sidebar" aria-expanded="false" aria-pressed="false"><span data-icon="tag"></span><span>标签</span><i id="sidebar-filter-dot" hidden></i></button>
+  <aside class="tag-sidebar" id="tag-sidebar" aria-label="标签与搜索" inert>
+    <div class="sidebar-heading"><div><div class="eyebrow">FIND YOUR INSPIRATION</div><h2>标签与搜索</h2></div><button class="button-icon" id="sidebar-close" aria-label="收起标签侧栏"><span data-icon="x"></span></button></div>
+    <div class="sidebar-content"><label class="field-label" for="search-input">搜索素材</label><label class="search-box sidebar-search"><span data-icon="search"></span><input id="search-input" type="search" placeholder="名称、标签、提示词或项目详情…" aria-label="搜索素材"><kbd>/</kbd></label>
+    <div class="sidebar-tag-title"><label class="field-label" for="tag-search">标签分类</label><span class="field-help" id="tag-total"></span></div>
+    <label class="search-box sidebar-search"><span data-icon="tag"></span><input id="tag-search" type="search" placeholder="搜索标签…" aria-label="搜索标签"></label>
+    <p class="sidebar-scope" id="tag-scope">全部素材的标签</p><div class="tag-filters" id="tag-filters" aria-label="按标签筛选"></div><p class="field-help" id="no-tags" hidden>没有匹配的标签，试试其他关键词。</p></div>
+    <div class="sidebar-footer"><span id="sidebar-hint">悬停展开 · 点击按钮固定</span><button id="clear-filters" class="text-button" hidden>重置筛选</button></div>
+  </aside>
+  <main id="main" class="main-shell" tabindex="-1">
+    <section class="intro" aria-labelledby="page-title">
+      <div><div class="eyebrow"><span></span><span id="page-eyebrow">A HOME FOR YOUR IDEAS</span></div><h1 id="page-title">让创作，有迹可循<span class="title-dot">。</span></h1><p id="page-description">把项目、影像与灵感收在一起，让好创意在下一次创作中继续。</p></div>
+      <div class="stats" aria-label="资产概览"><a href="#/projects"><strong id="count-projects">—</strong><span>项目</span></a><a href="#/images"><strong id="count-images">—</strong><span>图片</span></a><a href="#/videos"><strong id="count-videos">—</strong><span>视频</span></a></div>
+    </section>
+    <section class="upload-strip" id="page-drop" aria-label="素材上传区">
+      <div class="upload-icon" data-icon="upload"></div><div class="upload-copy"><strong id="drop-title">给灵感，一个落脚的地方</strong><span id="drop-description">将图片、视频或项目文件拖到这里，也可以添加项目链接</span></div><button class="button button-dark" id="open-upload"><span data-icon="plus"></span><span id="upload-button-text">上传素材</span></button>
+    </section>
+    <section class="library" aria-label="素材库">
+      <div class="library-heading"><div class="section-title"><h2 id="section-title">全部素材</h2><span id="result-count" class="count-badge">0</span><span class="demo-label" id="demo-label">含示例素材</span></div><div class="library-heading-end"><span class="library-note">每一帧，都是下一次创作的起点</span></div></div>
+      <div class="library-toolbar">
+        <div class="type-tabs" id="type-tabs" aria-label="素材类型"><button class="active" data-type="all">全部</button><button data-type="project"><span data-icon="folder"></span>项目</button><button data-type="image"><span data-icon="image"></span>图片</button><button data-type="video"><span data-icon="video"></span>视频</button></div>
+        <button class="button button-light" id="sidebar-open" aria-controls="tag-sidebar" aria-expanded="false"><span data-icon="tag"></span>标签与搜索</button>
+        <button class="button-icon favorite-filter" id="favorite-filter" aria-label="只看收藏" title="只看收藏" aria-pressed="false"><span data-icon="bookmark"></span></button>
+        <label class="sort-control"><span data-icon="sort"></span><select id="sort-select" aria-label="素材排序"><option value="newest">最近添加</option><option value="oldest">最早添加</option><option value="title">名称排序</option></select><span data-icon="chevron-down"></span></label>
+        <button class="button button-light" id="batch-toggle" aria-pressed="false"><span data-icon="select"></span>批量管理</button>
+      </div>
+      <div class="filter-summary" id="filter-summary"><span id="filter-summary-text">全部素材</span><button class="text-button" id="reset-visible-filters" hidden>清除筛选<span data-icon="x"></span></button></div>
+      <div class="batch-bar" id="batch-bar" hidden><label><input id="select-all" type="checkbox">全选当前结果</label><span id="selection-count" aria-live="polite">已选 0 项</span><span class="batch-note">筛选变化时仅保留可见项</span><button class="button button-danger" id="delete-selected" disabled><span data-icon="trash"></span>删除所选</button><button class="text-button" id="batch-cancel">完成</button></div>
+      <div class="asset-grid" id="asset-grid" aria-live="polite"><div class="loading-state">正在打开你的资产库…</div></div>
+      <div class="empty-state" id="empty-state" hidden><div data-icon="search"></div><h3>还没有找到这份灵感</h3><p>换个关键词，或上传你的第一份素材。</p><button class="button button-light" id="empty-action">重置筛选</button></div>
+      <div class="grid-end" id="grid-end"><span></span><p>灵感不止于此，期待你的下一份收藏</p><span></span></div>
+    </section>
+    <footer class="site-footer"><span class="footer-brand">火石<span>.</span> <span class="footer-slogan">为每一份创作，留一帧。</span></span><span><i></i><span id="storage-status">保存在当前浏览器</span><span class="footer-version">V 0.3</span></span></footer>
+  </main>
+  <dialog id="upload-dialog" class="upload-dialog" aria-labelledby="upload-dialog-title">
+    <form id="upload-form">
+      <div class="dialog-header"><div><div class="eyebrow">ADD TO YOUR LIBRARY</div><h2 id="upload-dialog-title">添加一份灵感</h2></div><button type="button" class="button-icon" data-close="upload-dialog" aria-label="关闭上传窗口"><span data-icon="x"></span></button></div>
+      <div class="dialog-body"><div class="upload-types" id="upload-types"><button type="button" data-upload-type="image" class="active"><span data-icon="image"></span>图片</button><button type="button" data-upload-type="video"><span data-icon="video"></span>视频</button><button type="button" data-upload-type="project"><span data-icon="folder"></span>项目 / 文档</button></div>
+      <div id="project-fields" hidden><label class="field-label" for="project-title">项目标题</label><input id="project-title" class="text-input" maxlength="120" placeholder="例如：秋日品牌视觉提案"><label class="field-label" for="project-link">项目链接 <span>选填</span></label><input id="project-link" class="text-input" type="url" placeholder="https://…"><p class="field-help">添加项目链接，或在下方上传项目文档。</p></div>
+      <button type="button" class="file-drop" id="choose-files"><span data-icon="upload"></span><strong>点击选择文件，或拖拽到这里</strong><span id="file-hint">支持 JPG、PNG、WebP、GIF 等常用图片格式</span><small>支持批量上传 · 单文件不超过 500 MB</small></button>
+      <input type="file" id="upload-files" accept="image/*" multiple hidden>
+      <div class="selected-files" id="selected-files"></div><p class="local-note"><span data-icon="info"></span>本版素材保存在当前浏览器，暂未连接公司 NAS。</p><p id="upload-error" class="form-error" role="alert"></p></div>
+      <div class="dialog-footer"><button type="button" class="button button-light" data-close="upload-dialog">取消</button><button type="submit" id="confirm-upload" class="button button-dark"><span data-icon="plus"></span>添加到资产库</button></div>
+    </form>
+  </dialog>
+  <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-dialog-title">
+    <form id="detail-form">
+      <div class="dialog-header"><div class="detail-heading"><span id="detail-type-icon"></span><h2 id="detail-dialog-title">素材详情</h2><span id="detail-demo" class="demo-label">示例素材</span></div><button type="button" class="button-icon" data-close="detail-dialog" aria-label="关闭素材详情"><span data-icon="x"></span></button></div>
+      <div class="detail-body"><div class="detail-main"><div class="detail-preview" id="detail-preview"></div>
+        <div class="detail-section"><div class="field-heading"><label for="detail-prompt">创作提示词 <span>PROMPT</span></label><div><button type="button" class="text-button" id="import-prompt"><span data-icon="upload"></span>导入文本</button><button type="button" class="text-button" id="copy-prompt"><span data-icon="copy"></span>复制</button></div></div><textarea id="detail-prompt" rows="5" placeholder="记录这份素材的提示词、创作思路或生成参数，让灵感可以再次发生…"></textarea><input type="file" id="prompt-file" accept=".txt,.md,.json,text/plain,text/markdown,application/json" hidden></div>
+        <div class="detail-section"><div class="field-heading"><label>参考图片 <span>REFERENCES</span></label><span class="field-help" id="reference-count">0 / 8</span></div><div id="reference-list" class="reference-list"></div><input type="file" id="reference-files" accept="image/*" multiple hidden></div>
+      </div><aside class="detail-sidebar"><label class="field-label" for="detail-title">素材标题</label><input id="detail-title" class="text-input" maxlength="120" required placeholder="给素材起一个名字"><label class="field-label" for="detail-tags">标签 <span>按 Enter 添加</span></label><div class="tag-editor"><div id="editable-tags"></div><input id="detail-tags" maxlength="100" placeholder="添加关键词…" aria-label="添加标签"></div><p class="field-help">用主题、风格、场景描述素材，方便下次找到它。</p><div id="detail-project-link-field" hidden><label class="field-label" for="detail-project-link">项目链接</label><input type="url" id="detail-project-link" class="text-input" placeholder="https://…"><a id="visit-project" class="project-link" target="_blank" rel="noopener noreferrer">打开项目<span data-icon="external"></span></a></div><div class="metadata" id="detail-metadata"></div><button type="button" class="button button-light full-width" id="download-asset"><span data-icon="download"></span>下载原文件</button><button type="button" class="text-button cover-button" id="choose-cover"><span data-icon="image"></span>设置封面图片</button><input type="file" id="cover-file" accept="image/*" hidden><p id="detail-error" class="form-error" role="alert"></p></aside></div>
+      <div class="dialog-footer detail-footer"><button type="button" class="text-button delete-text" id="delete-current"><span data-icon="trash"></span>删除素材</button><div><button type="button" class="button button-light" data-close="detail-dialog">取消</button><button type="submit" id="save-detail" class="button button-dark"><span data-icon="check"></span>保存修改</button></div></div>
+    </form>
+  </dialog>
+  <dialog id="info-dialog" class="info-dialog" aria-labelledby="info-title"><div class="dialog-header"><h2 id="info-title">你的本地工作区</h2><button class="button-icon" data-close="info-dialog" aria-label="关闭工作区说明"><span data-icon="x"></span></button></div><div class="dialog-body"><p>这是公司资产库的第一版框架。你可以上传素材、添加项目链接、编辑标题、标签、提示词和参考图。</p><p>数据保存在<strong>当前设备的当前浏览器</strong>。刷新页面后仍会保留，但更换浏览器、清除网站数据或浏览器回收存储空间可能导致数据丢失，请保留原文件。</p><p>当前尚未连接 NAS，也没有多人共享。页面中的示例素材用于展示布局。</p><button class="button button-light" id="remove-demos">移除示例素材</button><p class="field-help">仅移除演示内容，保留你自己上传的素材。</p></div></dialog>
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+  <dialog id="delete-dialog" class="delete-dialog" aria-labelledby="delete-title"><div class="dialog-header"><div><div class="eyebrow">MANAGE YOUR LIBRARY</div><h2 id="delete-title">删除所选素材？</h2></div><button class="button-icon" data-close="delete-dialog" aria-label="取消删除"><span data-icon="x"></span></button></div><div class="dialog-body"><p id="delete-description"></p><ul id="delete-list" class="delete-list"></ul><p class="field-help">此操作会移除资产库中的内容和附件，无法撤销；电脑上的源文件不受影响。删除记录可在右上角「删除日志」中查看。</p><p class="form-error" id="delete-error" role="alert"></p></div><div class="dialog-footer"><button class="button button-light" data-close="delete-dialog" autofocus>取消</button><button class="button button-danger" id="confirm-delete"><span data-icon="trash"></span>确认删除</button></div></dialog>
+  <dialog id="logs-dialog" class="logs-dialog" aria-labelledby="logs-title"><div class="dialog-header"><div><div class="eyebrow">WORKSPACE ACTIVITY</div><h2 id="logs-title">管理日志 <span class="count-badge" id="logs-count">0</span></h2></div><button class="button-icon" data-close="logs-dialog" aria-label="关闭管理日志"><span data-icon="x"></span></button></div><div class="dialog-body"><div class="logs-toolbar"><label class="search-box"><span data-icon="search"></span><input type="search" id="log-search" placeholder="搜索已删除内容的标题、标签或记录编号…" aria-label="搜索删除日志"></label><label class="log-type-label"><select id="log-type" aria-label="日志素材类型"><option value="all">全部类型</option><option value="project">项目</option><option value="image">图片</option><option value="video">视频</option></select></label></div><p class="logs-note">保留删除时间、原始标题、标签及操作批次。日志仅在当前浏览器保存，清除网站数据后也会清除。</p><div id="log-list" class="log-list" aria-live="polite"></div></div></dialog>
+</body>
+</html>
