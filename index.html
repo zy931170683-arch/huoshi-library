@@ -9,10 +9,14 @@
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./landing.css">
+  <link rel="stylesheet" href="./auth.css">
+  <script src="./auth-store.js" defer></script>
+  <script src="./backend.js" defer></script>
+  <script src="./auth.js" defer></script>
   <script src="./landing.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
-<body class="landing-mode">
+<body class="landing-mode guest-view">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="huoshi-wordmark" viewBox="225 195 1590 390"><image href="./assets/huoshi-logo.png" width="1983" height="793"/></symbol></defs></svg>
   <a href="#main" class="skip-link">跳到素材列表</a>
   <header class="site-header">
@@ -20,12 +24,12 @@
       <a class="brand huoshi-logo" href="#/home" aria-label="火石 AIGC 首页"><svg viewBox="0 0 1590 390" role="img" aria-label="火石 AIGC"><use href="#huoshi-wordmark"/></svg></a>
       <nav class="main-nav" aria-label="主导航">
         <a href="#/home" data-route="home">首页</a>
-        <a href="#/library" data-route="library">火石项目库</a>
+        <a href="#/library" data-route="library">素材资产总览</a>
         <a href="#/projects" data-route="projects">项目总管</a>
         <a href="#/images" data-route="images">图片整理</a>
         <a href="#/videos" data-route="videos">视频整理</a>
       </nav>
-      <div class="header-end"><span class="workspace-label"><i></i> 本地工作区</span><button class="button-icon" id="open-logs" aria-label="查看删除日志" title="删除日志"><span data-icon="history"></span></button><button class="avatar" id="workspace-info" aria-label="查看工作区说明">火</button></div>
+      <div class="header-end"><span class="workspace-label"><i></i> 本地工作区</span><button class="button-icon" id="open-logs" aria-label="查看删除日志" title="删除日志"><span data-icon="history"></span></button><button class="avatar" id="workspace-info" data-account-open aria-label="登录或注册" title="登录或注册"><span data-icon="user"></span></button></div>
     </div>
   </header>
   <div id="home-view">
@@ -42,8 +46,8 @@
     <div class="sidebar-heading"><div><div class="eyebrow">FIND YOUR INSPIRATION</div><h2>标签与搜索</h2></div><button class="button-icon" id="sidebar-close" aria-label="收起标签侧栏"><span data-icon="x"></span></button></div>
     <div class="sidebar-content"><label class="field-label" for="search-input">搜索素材</label><label class="search-box sidebar-search"><span data-icon="search"></span><input id="search-input" type="search" placeholder="名称、标签、提示词或项目详情…" aria-label="搜索素材"><kbd>/</kbd></label>
     <div class="sidebar-tag-title"><label class="field-label" for="tag-search">标签分类</label><span class="field-help" id="tag-total"></span></div>
-    <label class="search-box sidebar-search"><span data-icon="tag"></span><input id="tag-search" type="search" placeholder="搜索标签…" aria-label="搜索标签"></label>
-    <p class="sidebar-scope" id="tag-scope">全部素材的标签</p><div class="tag-filters" id="tag-filters" aria-label="按标签筛选"></div><p class="field-help" id="no-tags" hidden>没有匹配的标签，试试其他关键词。</p></div>
+    <label class="search-box sidebar-search"><span data-icon="tag"></span><input id="tag-search" type="search" placeholder="搜索标签或项目名称…" aria-label="搜索标签或项目名称"></label>
+    <p class="sidebar-scope" id="tag-scope">全部素材的标签</p><div class="tag-filters" id="tag-filters" aria-label="按标签筛选"></div><p class="field-help" id="no-tags" hidden>没有匹配的标签，试试其他关键词。</p><section id="project-filter-section"><div class="sidebar-tag-title"><span class="field-label">所属项目</span></div><div class="tag-filters" id="project-filters" aria-label="按项目筛选"></div><p class="field-help" id="no-projects" hidden>没有匹配的项目。</p><p class="sidebar-scope">在素材资产总览中，可同时查看项目关联的图片和视频。</p></section></div>
     <div class="sidebar-footer"><span id="sidebar-hint">悬停展开 · 点击按钮固定</span><button id="clear-filters" class="text-button" hidden>重置筛选</button></div>
   </aside>
   <main id="main" class="main-shell" tabindex="-1">
@@ -69,7 +73,7 @@
       <div class="empty-state" id="empty-state" hidden><div data-icon="search"></div><h3>还没有找到这份灵感</h3><p>换个关键词，或上传你的第一份素材。</p><button class="button button-light" id="empty-action">重置筛选</button></div>
       <div class="grid-end" id="grid-end"><span></span><p>灵感不止于此，期待你的下一份收藏</p><span></span></div>
     </section>
-    <footer class="site-footer"><span class="footer-brand">火石<span>.</span> <span class="footer-slogan">为每一份创作，留一帧。</span></span><span><i></i><span id="storage-status">保存在当前浏览器</span><span class="footer-version">V 0.3</span></span></footer>
+    <footer class="site-footer"><span class="footer-brand">火石<span>.</span> <span class="footer-slogan">为每一份创作，留一帧。</span></span><span><i></i><span id="storage-status">保存在当前浏览器</span><span class="footer-version">V 0.5</span></span></footer>
   </main>
   <dialog id="upload-dialog" class="upload-dialog" aria-labelledby="upload-dialog-title">
     <form id="upload-form">
@@ -88,7 +92,7 @@
       <div class="detail-body"><div class="detail-main"><div class="detail-preview" id="detail-preview"></div>
         <div class="detail-section"><div class="field-heading"><label for="detail-prompt">创作提示词 <span>PROMPT</span></label><div><button type="button" class="text-button" id="import-prompt"><span data-icon="upload"></span>导入文本</button><button type="button" class="text-button" id="copy-prompt"><span data-icon="copy"></span>复制</button></div></div><textarea id="detail-prompt" rows="5" placeholder="记录这份素材的提示词、创作思路或生成参数，让灵感可以再次发生…"></textarea><input type="file" id="prompt-file" accept=".txt,.md,.json,text/plain,text/markdown,application/json" hidden></div>
         <div class="detail-section"><div class="field-heading"><label>参考图片 <span>REFERENCES</span></label><span class="field-help" id="reference-count">0 / 8</span></div><div id="reference-list" class="reference-list"></div><input type="file" id="reference-files" accept="image/*" multiple hidden></div>
-      </div><aside class="detail-sidebar"><label class="field-label" for="detail-title">素材标题</label><input id="detail-title" class="text-input" maxlength="120" required placeholder="给素材起一个名字"><label class="field-label" for="detail-tags">标签 <span>按 Enter 添加</span></label><div class="tag-editor"><div id="editable-tags"></div><input id="detail-tags" maxlength="100" placeholder="添加关键词…" aria-label="添加标签"></div><p class="field-help">用主题、风格、场景描述素材，方便下次找到它。</p><div id="detail-project-link-field" hidden><label class="field-label" for="detail-project-link">项目链接</label><input type="url" id="detail-project-link" class="text-input" placeholder="https://…"><a id="visit-project" class="project-link" target="_blank" rel="noopener noreferrer">打开项目<span data-icon="external"></span></a></div><div class="metadata" id="detail-metadata"></div><button type="button" class="button button-light full-width" id="download-asset"><span data-icon="download"></span>下载原文件</button><button type="button" class="text-button cover-button" id="choose-cover"><span data-icon="image"></span>设置封面图片</button><input type="file" id="cover-file" accept="image/*" hidden><p id="detail-error" class="form-error" role="alert"></p></aside></div>
+      </div><aside class="detail-sidebar"><label class="field-label" for="detail-title">素材标题</label><input id="detail-title" class="text-input" maxlength="120" required placeholder="给素材起一个名字"><label class="field-label" for="detail-tags">标签 <span>按 Enter 添加</span></label><div class="tag-editor"><div id="editable-tags"></div><input id="detail-tags" maxlength="100" placeholder="添加关键词…" aria-label="添加标签"></div><p class="field-help">用主题、风格、场景描述素材，方便下次找到它。</p><div id="detail-project-field"><label class="field-label" for="detail-project">所属项目</label><select id="detail-project" class="text-input" aria-describedby="detail-project-help"><option value="">暂不加入项目</option></select><p class="field-help" id="detail-project-help"></p></div><div id="detail-project-link-field" hidden><label class="field-label" for="detail-project-link">项目链接</label><input type="url" id="detail-project-link" class="text-input" placeholder="https://…"><a id="visit-project" class="project-link" target="_blank" rel="noopener noreferrer">打开项目<span data-icon="external"></span></a></div><div class="metadata" id="detail-metadata"></div><button type="button" class="button button-light full-width" id="download-asset"><span data-icon="download"></span>下载原文件</button><button type="button" class="text-button cover-button" id="choose-cover"><span data-icon="image"></span>设置封面图片</button><input type="file" id="cover-file" accept="image/*" hidden><p id="detail-error" class="form-error" role="alert"></p></aside></div>
       <div class="dialog-footer detail-footer"><button type="button" class="text-button delete-text" id="delete-current"><span data-icon="trash"></span>删除素材</button><div><button type="button" class="button button-light" data-close="detail-dialog">取消</button><button type="submit" id="save-detail" class="button button-dark"><span data-icon="check"></span>保存修改</button></div></div>
     </form>
   </dialog>
@@ -96,5 +100,25 @@
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
   <dialog id="delete-dialog" class="delete-dialog" aria-labelledby="delete-title"><div class="dialog-header"><div><div class="eyebrow">MANAGE YOUR LIBRARY</div><h2 id="delete-title">删除所选素材？</h2></div><button class="button-icon" data-close="delete-dialog" aria-label="取消删除"><span data-icon="x"></span></button></div><div class="dialog-body"><p id="delete-description"></p><ul id="delete-list" class="delete-list"></ul><p class="field-help">此操作会移除资产库中的内容和附件，无法撤销；电脑上的源文件不受影响。删除记录可在右上角「删除日志」中查看。</p><p class="form-error" id="delete-error" role="alert"></p></div><div class="dialog-footer"><button class="button button-light" data-close="delete-dialog" autofocus>取消</button><button class="button button-danger" id="confirm-delete"><span data-icon="trash"></span>确认删除</button></div></dialog>
   <dialog id="logs-dialog" class="logs-dialog" aria-labelledby="logs-title"><div class="dialog-header"><div><div class="eyebrow">WORKSPACE ACTIVITY</div><h2 id="logs-title">管理日志 <span class="count-badge" id="logs-count">0</span></h2></div><button class="button-icon" data-close="logs-dialog" aria-label="关闭管理日志"><span data-icon="x"></span></button></div><div class="dialog-body"><div class="logs-toolbar"><label class="search-box"><span data-icon="search"></span><input type="search" id="log-search" placeholder="搜索已删除内容的标题、标签或记录编号…" aria-label="搜索删除日志"></label><label class="log-type-label"><select id="log-type" aria-label="日志素材类型"><option value="all">全部类型</option><option value="project">项目</option><option value="image">图片</option><option value="video">视频</option></select></label></div><p class="logs-note">保留删除时间、原始标题、标签及操作批次。日志仅在当前浏览器保存，清除网站数据后也会清除。</p><div id="log-list" class="log-list" aria-live="polite"></div></div></dialog>
+  <dialog id="auth-dialog" class="auth-dialog" aria-labelledby="auth-title">
+    <div class="dialog-header"><div><div class="eyebrow">HUOSHI · YOUR CREATIVE SPACE</div><h2 id="auth-title">欢迎回来</h2></div><button class="button-icon" data-close="auth-dialog" aria-label="关闭账号窗口"><span data-icon="x"></span></button></div>
+    <div class="dialog-body">
+      <div id="auth-entry">
+        <p class="auth-intro" id="auth-intro">登录后，把灵感收进自己的创作日常。</p>
+        <div class="auth-tabs" role="tablist" aria-label="账号操作"><button type="button" role="tab" id="auth-tab-login" aria-selected="true" aria-controls="auth-form" data-auth-mode="login">登录</button><button type="button" role="tab" id="auth-tab-register" aria-selected="false" aria-controls="auth-form" data-auth-mode="register">注册</button></div>
+        <form id="auth-form">
+          <label class="field-label" for="auth-phone">手机号</label><input id="auth-phone" class="text-input" type="tel" inputmode="tel" autocomplete="username" maxlength="20" placeholder="请输入中国大陆手机号" required>
+          <label class="field-label" for="auth-password" id="auth-password-label">密码</label><div class="auth-password"><input id="auth-password" class="text-input" type="password" autocomplete="current-password" minlength="8" maxlength="128" placeholder="请输入密码" required><button type="button" id="auth-show-password" aria-label="显示密码" aria-pressed="false">显示</button></div>
+          <div class="auth-help-row"><button type="button" class="text-button" id="auth-forgot">忘记密码？</button></div>
+          <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p><button type="submit" class="button button-dark auth-submit" id="auth-submit">登录</button>
+        </form>
+      </div>
+      <div id="account-panel" hidden><div class="account-identity"><span class="avatar is-member" id="account-initial">火</span><div><strong id="account-phone"></strong><small id="account-since"></small></div></div><div class="account-actions"><button type="button" class="button button-light" id="account-admin" hidden><span data-icon="user"></span>账号管理</button><button type="button" class="button button-light" id="account-records"><span data-icon="history"></span>账号记录</button><button type="button" class="button button-light" id="account-import" hidden><span data-icon="upload"></span>导入本地素材</button><button type="button" class="button button-light" id="account-workspace"><span data-icon="info"></span>工作区说明</button><button type="button" class="button button-light logout-button" id="account-logout">退出登录</button></div></div>
+      <p class="auth-footnote" id="auth-footnote"></p>
+    </div>
+  </dialog>
+  <dialog id="account-logs-dialog" class="auth-dialog" aria-labelledby="account-logs-title"><div class="dialog-header"><div><div class="eyebrow">ACCOUNT ACTIVITY</div><h2 id="account-logs-title">账号记录</h2></div><button class="button-icon" data-close="account-logs-dialog" aria-label="关闭账号记录"><span data-icon="x"></span></button></div><div class="dialog-body"><p class="auth-intro" id="account-log-note">记录注册和密码重置时间，不记录明文密码。</p><div class="auth-log-actions"><button class="button button-light" id="export-account-log"><span data-icon="download"></span>导出 .log</button></div><div id="account-log-list" class="auth-log-list"></div><p class="auth-status" id="account-log-status" role="status"></p></div></dialog>
+  <dialog id="admin-dialog" class="auth-dialog" aria-labelledby="admin-title"><div class="dialog-header"><div><div class="eyebrow">TEAM ACCOUNTS</div><h2 id="admin-title">账号管理</h2></div><button class="button-icon" data-close="admin-dialog" aria-label="关闭账号管理"><span data-icon="x"></span></button></div><div class="dialog-body"><p class="auth-intro">确认同事身份后，为其设置新密码。重置后，该账号原有登录会话会退出。</p><form id="admin-reset-form"><label class="field-label" for="admin-phone">需要重置的手机号</label><input id="admin-phone" class="text-input" type="tel" autocomplete="off" required placeholder="请输入已注册手机号"><label class="field-label" for="admin-password">新密码</label><input id="admin-password" class="text-input" type="password" autocomplete="new-password" minlength="8" maxlength="128" required placeholder="设置 8–128 位新密码"><p class="auth-status" id="admin-status" role="status"></p><button class="button button-dark full-width" type="submit" id="admin-reset-submit">重置该账号密码</button></form><div class="admin-list-heading"><span>已注册账号</span><a class="text-button" id="admin-export" href="/api/admin/logs/download" download>导出管理日志</a></div><div id="admin-users" class="auth-log-list"></div></div></dialog>
+  <dialog id="import-local-dialog" class="auth-dialog" aria-labelledby="import-local-title"><div class="dialog-header"><div><div class="eyebrow">BRING YOUR WORK TOGETHER</div><h2 id="import-local-title">导入本地素材</h2></div><button class="button-icon" data-close="import-local-dialog" aria-label="关闭导入窗口"><span data-icon="x"></span></button></div><div class="dialog-body"><p class="auth-intro" id="import-local-description"></p><p class="field-help">导入后，同事可以在共享素材库看到这些内容。本地原记录保留，成功导入的项目不会重复导入。</p><p class="auth-status" id="import-local-status" role="status"></p><button class="button button-dark full-width" id="import-local-confirm">导入到共享素材库</button></div></dialog>
 </body>
 </html>

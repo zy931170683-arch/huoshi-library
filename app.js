@@ -3,6 +3,7 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const icons = {
+  user:'<circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   x:'<path d="m6 6 12 12M6 18 18 6"/>',
   check:'<path d="m5 12 4 4L19 6"/>',
@@ -32,7 +33,7 @@ const typeLabels = {image:'图片',video:'视频',project:'项目'};
 const typeIcons = {image:'image',video:'video',project:'folder'};
 const routeConfig = {
   home:{title:'火石素材库',eyebrow:'HUOSHI CREATIVE ARCHIVE',description:'',section:'首页',upload:'上传素材',drop:'',hint:'',type:'all'},
-  library:{title:'火石项目库',eyebrow:'A HOME FOR YOUR IDEAS',description:'把项目、影像与灵感收在一起，让好创意在下一次创作中继续。',section:'全部素材',upload:'上传素材',drop:'给灵感，一个落脚的地方',hint:'将图片、视频或项目文件拖到这里，也可以添加项目链接',type:'all'},
+  library:{title:'素材资产总览',eyebrow:'A HOME FOR YOUR IDEAS',description:'把项目、影像与灵感收在一起，让好创意在下一次创作中继续。',section:'全部素材',upload:'上传素材',drop:'给灵感，一个落脚的地方',hint:'将图片、视频或项目文件拖到这里，也可以添加项目链接',type:'all'},
   projects:{title:'把好创意，整理成章',eyebrow:'PROJECTS & POSSIBILITIES',description:'从第一份提案到最后一次交付，让项目的每一步都清晰可见。',section:'项目总管',upload:'添加项目',drop:'每个项目，都从一个想法开始',hint:'拖入提案、项目文档，或添加飞书、Notion 等项目链接',type:'project'},
   images:{title:'收藏每一个，心动瞬间',eyebrow:'COLLECT THE WAY YOU SEE',description:'整理画面、记录灵感，让值得收藏的影像随时被找到。',section:'图片整理',upload:'上传图片',drop:'把值得珍藏的画面，放在这里',hint:'拖拽图片到这里，支持 JPG、PNG、WebP、GIF 等格式',type:'image'},
   videos:{title:'让每一帧，都有归处',eyebrow:'MOTION WITH A MEANING',description:'从随手记录到精心制作，建立属于团队的动态影像资料库。',section:'视频整理',upload:'上传视频',drop:'下一段故事，从这里开始',hint:'拖拽视频到这里，支持 MP4、WebM、MOV 等格式',type:'video'}
@@ -41,10 +42,12 @@ const MAX_FILE_BYTES = 500 * 1024 * 1024;
 const blobURLs = new WeakMap();
 const activeURLs = new Set();
 let db;
+let accountStore;
 let assets = [];
 let route = 'home';
 let filterType = 'all';
 let filterTag = '';
+let filterProject = '';
 let favoritesOnly = false;
 let search = '';
 let sort = 'newest';
@@ -66,7 +69,7 @@ function blobURL(blob) {
   if (!blobURLs.has(blob)) { const url = URL.createObjectURL(blob); blobURLs.set(blob, url); activeURLs.add(url); }
   return blobURLs.get(blob);
 }
-function mediaURL(asset) { return asset.blob ? blobURL(asset.blob) : asset.src || ''; }
+function mediaURL(asset) { if(asset.originalURL&&window.HuoshiAccounts.user)return asset.originalURL;return asset.blob ? blobURL(asset.blob) : asset.src || ''; }
 function previewURL(asset) { return asset.cover ? blobURL(asset.cover) : asset.thumbnail ? blobURL(asset.thumbnail) : asset.preview || ((asset.mediaKind || asset.type) === 'image' ? mediaURL(asset) : ''); }
 function formatBytes(bytes) { if (!bytes) return '—'; const unit = bytes >= 1024 ** 3 ? 'GB' : bytes >= 1024 ** 2 ? 'MB' : 'KB'; const divisor = {GB:1024 ** 3,MB:1024 ** 2,KB:1024}[unit]; return `${(bytes/divisor).toFixed(1)} ${unit}`; }
 function formatDuration(seconds) { if (!Number.isFinite(seconds)) return ''; return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(Math.floor(seconds%60)).padStart(2,'0')}`; }
@@ -77,12 +80,15 @@ function storageError(error) { return error?.name === 'QuotaExceededError' ? '�
 
 function openDatabase() {
   return new Promise((resolve,reject) => {
-    const request = indexedDB.open('frame-asset-library',2);
+    const request = indexedDB.open('frame-asset-library',3);
     request.onupgradeneeded = () => {
       const database=request.result;
       if(!database.objectStoreNames.contains('assets'))database.createObjectStore('assets',{keyPath:'id'});
       if(!database.objectStoreNames.contains('settings'))database.createObjectStore('settings');
       if(!database.objectStoreNames.contains('deletionLogs'))database.createObjectStore('deletionLogs',{keyPath:'id'});
+      if(!database.objectStoreNames.contains('accounts'))database.createObjectStore('accounts',{keyPath:'phone'});
+      if(!database.objectStoreNames.contains('authSessions'))database.createObjectStore('authSessions',{keyPath:'token'});
+      if(!database.objectStoreNames.contains('authEvents'))database.createObjectStore('authEvents',{keyPath:'id'}).createIndex('phone','phone');
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -90,7 +96,7 @@ function openDatabase() {
   });
 }
 function readStore(name, key) { return new Promise((resolve,reject) => { const req = key === undefined ? db.transaction(name).objectStore(name).getAll() : db.transaction(name).objectStore(name).get(key); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
-function saveAssets(items) { return new Promise((resolve,reject) => { const tx = db.transaction('assets','readwrite'); items.forEach(item => tx.objectStore('assets').put(item)); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error); }); }
+function saveAssets(items) { window.HuoshiAccounts.assertLogin(); if(window.HuoshiBackend.connected)return window.HuoshiBackend.save(items);return new Promise((resolve,reject) => { const tx = db.transaction(['assets','accounts','authSessions'],'readwrite'); accountStore.authorizeTransaction(tx,()=>items.forEach(item => tx.objectStore('assets').put(item))); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error||new Error('登录状态已失效，请重新登录后保存。')); }); }
 function seedDatabase(items) { return new Promise((resolve,reject) => { const tx = db.transaction(['assets','settings'],'readwrite'); items.forEach(item => tx.objectStore('assets').put(item)); tx.objectStore('settings').put(true,'seeded'); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error); }); }
 function createSamples() {
   const definitions = [
@@ -114,20 +120,30 @@ function createSamples() {
 }
 
 function currentScope() { const type = routeConfig[route].type; return assets.filter(asset => type === 'all' || asset.type === type); }
+function projectName(id) { return assets.find(a=>a.id===id&&a.type==='project')?.title || (id?'已删除的项目':''); }
+function renderProjectPicker() {
+  const field=$('#detail-project-field'),select=$('#detail-project');
+  field.hidden=draft.type==='project';
+  const projects=assets.filter(a=>a.type==='project').sort((a,b)=>a.title.localeCompare(b.title,'zh-CN'));
+  select.innerHTML='<option value="">暂不加入项目</option>'+projects.map(a=>`<option value="${escapeHTML(a.id)}">${escapeHTML(a.title)}</option>`).join('');
+  if(draft.projectId&&!projects.some(a=>a.id===draft.projectId))select.insertAdjacentHTML('beforeend',`<option value="${escapeHTML(draft.projectId)}">原项目已删除 · 可重新选择</option>`);
+  select.value=draft.projectId||'';
+  $('#detail-project-help').textContent=projects.length?'选择后点击保存，可在左侧按项目筛选。':'还没有项目，请先在“项目总管”中添加项目。';
+}
 function filteredAssets() {
   const terms = search.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-  return currentScope().filter(a => (filterType==='all'||a.type===filterType)&&(!filterTag||a.tags.includes(filterTag))&&(!favoritesOnly||a.favorite)&&terms.every(term => [a.title,a.fileName,a.prompt,a.projectDetails,a.description,a.url,...a.tags].join(' ').toLocaleLowerCase().includes(term))).sort((a,b) => sort==='title' ? a.title.localeCompare(b.title,'zh-CN') : sort==='oldest' ? a.createdAt-b.createdAt : b.createdAt-a.createdAt);
+  return currentScope().filter(a => (filterType==='all'||a.type===filterType)&&(!filterTag||a.tags.includes(filterTag))&&(!filterProject||a.projectId===filterProject)&&(!favoritesOnly||a.favorite)&&terms.every(term => [a.title,a.fileName,a.prompt,a.projectDetails,a.description,a.url,projectName(a.projectId),...a.tags].join(' ').toLocaleLowerCase().includes(term))).sort((a,b) => sort==='title' ? a.title.localeCompare(b.title,'zh-CN') : sort==='oldest' ? a.createdAt-b.createdAt : b.createdAt-a.createdAt);
 }
 function updateRoute() {
   const next = location.hash.replace(/^#\/?/,'').split('?')[0];
   route = Object.hasOwn(routeConfig,next) ? next : 'home';
-  const config = routeConfig[route]; filterType = config.type; filterTag = ''; search = ''; favoritesOnly = false;
+  const config = routeConfig[route]; filterType = config.type; filterTag = ''; filterProject = ''; search = ''; favoritesOnly = false;
   selectedIds.clear();selectionMode=false;tagQuery='';$('#tag-search').value='';
   $('#search-input').value = ''; $('#favorite-filter').setAttribute('aria-pressed','false');
   $$('.main-nav a').forEach(a => { a.classList.toggle('active',a.dataset.route===route); if(a.dataset.route===route)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current'); });
   $('#page-title').innerHTML = `${escapeHTML(config.title)}<span class="title-dot">。</span>`;
   $('#page-eyebrow').textContent=config.eyebrow; $('#page-description').textContent=config.description; $('#section-title').textContent=config.section; $('#upload-button-text').textContent=config.upload; $('#drop-title').textContent=config.drop; $('#drop-description').textContent=config.hint;
-  $('#type-tabs').hidden=route!=='library'; document.title=`${route==='home'?'火石素材库':route==='library'?'火石项目库':config.section} · 火石 AIGC`;
+  $('#type-tabs').hidden=route!=='library'; document.title=`${route==='home'?'火石素材库':route==='library'?'素材资产总览':config.section} · 火石 AIGC`;
   setSidebar(false);window.HuoshiHome.setVisible(route==='home');
   render();
 }
@@ -140,6 +156,12 @@ function renderTags() {
   $('#tag-filters').innerHTML = `<button data-tag="" class="${filterTag?'':'active'}" aria-pressed="${!filterTag}"><span>全部标签</span><small>${scope.length}</small></button>${matches.map(tag=>`<button data-tag="${escapeHTML(tag)}" class="${filterTag===tag?'active':''}" aria-pressed="${filterTag===tag}"><span># ${escapeHTML(tag)}</span><small>${counts.get(tag)}</small></button>`).join('')}`;
   $('#tag-total').textContent=`${counts.size} 个标签`;$('#no-tags').hidden=!!matches.length;
   $('#tag-scope').textContent=`${filterType==='all'?'全部素材':typeLabels[filterType]}中的标签 · 数字为关联数量`;
+  $('#project-filter-section').hidden=filterType==='project';
+  const projects=assets.filter(a=>a.type==='project').sort((a,b)=>a.title.localeCompare(b.title,'zh-CN'));
+  if(filterProject&&!projects.some(a=>a.id===filterProject))projects.push({id:filterProject,title:'已删除的项目'});
+  const matchedProjects=projects.filter(a=>a.title.toLocaleLowerCase().includes(tagQuery.trim().toLocaleLowerCase()));
+  $('#project-filters').innerHTML=`<button data-project="" class="${filterProject?'':'active'}" aria-pressed="${!filterProject}"><span>不限项目</span><small>${scope.length}</small></button>`+matchedProjects.map(p=>`<button data-project="${escapeHTML(p.id)}" class="${filterProject===p.id?'active':''}" aria-pressed="${filterProject===p.id}"><span>${escapeHTML(p.title)}</span><small>${scope.filter(a=>a.projectId===p.id).length}</small></button>`).join('');
+  $('#no-projects').hidden=!!matchedProjects.length;
 }
 function cardHTML(asset, index) {
   const preview=previewURL(asset); let media;
@@ -153,17 +175,17 @@ function render() {
   for(const [plural,type] of [['projects','project'],['images','image'],['videos','video']]) $(`#count-${plural}`).textContent=String(assets.filter(a=>a.type===type).length).padStart(2,'0');
   const filtered=filteredAssets(); $('#result-count').textContent=filtered.length; $('#demo-label').hidden=!filtered.some(a=>a.demo);
   $$('#type-tabs button').forEach(b=>{b.classList.toggle('active',b.dataset.type===filterType);b.setAttribute('aria-pressed',b.dataset.type===filterType);});
-  const hasFilter=search||filterTag||favoritesOnly||filterType!==routeConfig[route].type;
+  const hasFilter=search||filterTag||filterProject||favoritesOnly||filterType!==routeConfig[route].type;
   $('#clear-filters').hidden=!hasFilter; renderTags();
   $('#asset-grid').innerHTML=filtered.map(cardHTML).join(''); $('#asset-grid').hidden=!filtered.length; $('#empty-state').hidden=!!filtered.length; $('#grid-end').hidden=!filtered.length;
   const visibleIds=new Set(filtered.map(a=>a.id));for(const id of selectedIds)if(!visibleIds.has(id))selectedIds.delete(id);
   decorateCards();renderSelection();
   $('#sidebar-filter-dot').hidden=!hasFilter;$('#reset-visible-filters').hidden=!hasFilter;
-  $('#filter-summary-text').textContent=[filterTag?`标签：${filterTag}`:'',search?`搜索：${search}`:'',favoritesOnly?'已收藏':''].filter(Boolean).join(' · ')||`${routeConfig[route].section} · 点击左侧标签，找到下一份灵感`;
+  $('#filter-summary-text').textContent=[filterProject?`项目：${projectName(filterProject)}`:'',filterTag?`标签：${filterTag}`:'',search?`搜索：${search}`:'',favoritesOnly?'已收藏':''].filter(Boolean).join(' · ')||`${routeConfig[route].section} · 点击左侧标签，找到下一份灵感`;
   $('#empty-action').textContent=hasFilter?'重置筛选':routeConfig[route].upload;
   if(!filtered.length){$('#empty-state h3').textContent=hasFilter?'还没有找到这份灵感':'给你的第一份灵感，留个位置';$('#empty-state p').textContent=hasFilter?'试试其他关键词或标签，发现更多素材。':'上传文件或添加项目链接，开始建立你的资产库。';}
 }
-function resetFilters() { search='';filterTag='';tagQuery='';$('#tag-search').value='';favoritesOnly=false;filterType=routeConfig[route].type;$('#search-input').value='';$('#favorite-filter').setAttribute('aria-pressed','false');render(); }
+function resetFilters() { search='';filterTag='';filterProject='';tagQuery='';$('#tag-search').value='';favoritesOnly=false;filterType=routeConfig[route].type;$('#search-input').value='';$('#favorite-filter').setAttribute('aria-pressed','false');render(); }
 
 function getMediaKind(file) { const ext=file.name.split('.').pop().toLowerCase(); if(file.type.startsWith('image/')||['jpg','jpeg','png','webp','gif','avif','bmp','svg','heic','heif'].includes(ext))return 'image'; if(file.type.startsWith('video/')||['mp4','webm','mov','m4v','ogv','avi','mkv'].includes(ext))return 'video'; return 'document'; }
 function imageMetadata(file) {
@@ -194,6 +216,7 @@ function validateFiles(files,type) {
   for(const file of files){if(file.size>MAX_FILE_BYTES)throw new Error(`「${file.name}」超过 500 MB，请选择较小的文件。`);if(type!=='all'&&type!=='project'&&getMediaKind(file)!==type)throw new Error(`此页面仅接受${typeLabels[type]}文件，请切换到对应分类上传。`);}
 }
 async function addFiles(files,type,project={}) {
+  window.HuoshiAccounts.assertLogin();
   validateFiles(files,type);const records=[];
   for(const file of files) records.push(await assetFromFile(file,type));
   if(type==='project'&&!files.length)records.push({id:crypto.randomUUID(),type:'project',mediaKind:'document',title:'',tags:[],prompt:'',references:[],format:'LINK',favorite:false,demo:false,createdAt:Date.now(),updatedAt:Date.now()});
@@ -206,17 +229,18 @@ function setUploadType(type) {
   $('#project-fields').hidden=type!=='project';$('#upload-files').accept=type==='image'?'image/*':type==='video'?'video/*,.mkv,.avi':'';
   $('#file-hint').textContent={image:'支持 JPG、PNG、WebP、GIF 等常用图片格式',video:'支持 MP4、WebM、MOV 等；预览取决于浏览器编码支持',project:'支持 PDF、PPT、Word、ZIP 等项目文件'}[type];renderSelectedFiles();
 }
-function openUpload() { if(!storageReady){toast('存储暂不可用，请刷新页面重试。',true);return}setSidebar(false);$('#upload-form').reset();setUploadType(routeConfig[route].type==='all'?'image':routeConfig[route].type);$('#upload-dialog').showModal(); }
+function openUpload() { if(!window.HuoshiAccounts.requireLogin())return; if(!storageReady){toast('存储暂不可用，请刷新页面重试。',true);return}setSidebar(false);$('#upload-form').reset();setUploadType(routeConfig[route].type==='all'?'image':routeConfig[route].type);$('#upload-dialog').showModal(); }
 function renderSelectedFiles() { $('#selected-files').innerHTML=selectedFiles.map((f,i)=>`<div class="selected-file"><span>${escapeHTML(f.name)}</span><small>${formatBytes(f.size)}</small><button type="button" data-remove-file="${i}" aria-label="移除 ${escapeHTML(f.name)}">${icon('x')}</button></div>`).join(''); }
 function selectFiles(files) { try{validateFiles(files,uploadType);selectedFiles.push(...files);renderSelectedFiles();$('#upload-error').textContent=''}catch(e){$('#upload-error').textContent=e.message} }
 function attachDropZone(element, onFiles) { let depth=0;element.addEventListener('dragenter',e=>{if(e.dataTransfer.types.includes('Files')){e.preventDefault();depth++;element.classList.add('drag-over')}});element.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});element.addEventListener('dragleave',()=>{depth=Math.max(0,depth-1);if(!depth)element.classList.remove('drag-over')});element.addEventListener('drop',e=>{e.preventDefault();depth=0;element.classList.remove('drag-over');if(e.dataTransfer.files.length)onFiles([...e.dataTransfer.files])}) }
 
 function renderEditableTags() { $('#editable-tags').innerHTML=draft.tags.map((tag,index)=>`<span class="editable-tag">${escapeHTML(tag)}<button type="button" data-remove-tag="${index}" aria-label="移除标签 ${escapeHTML(tag)}">${icon('x')}</button></span>`).join(''); }
-function commitTags() {const values=$('#detail-tags').value.split(/[,，;；\n]+/).map(t=>t.trim()).filter(Boolean);if(values.some(t=>t.length>30))throw new Error('每个标签请控制在 30 个字符以内。');const all=[...new Set([...draft.tags,...values])];if(all.length>24)throw new Error('每个素材最多添加 24 个标签。');draft.tags=all;$('#detail-tags').value='';renderEditableTags()}
-function renderReferences() { $('#reference-count').textContent=`${draft.references.length} / 8`;$('#reference-list').innerHTML=draft.references.map((ref,index)=>`<div class="reference-item"><img src="${escapeHTML(blobURL(ref.thumbnail||ref.blob))}" alt="参考图：${escapeHTML(ref.name)}"><button type="button" class="reference-remove" data-remove-reference="${index}" aria-label="移除参考图 ${escapeHTML(ref.name)}">${icon('x')}</button></div>`).join('')+(draft.references.length<8?`<button type="button" class="reference-add" id="add-reference">${icon('plus')}<span>添加参考图</span></button>`:''); }
+function commitTags() {window.HuoshiAccounts.assertLogin();const values=$('#detail-tags').value.split(/[,，;；\n]+/).map(t=>t.trim()).filter(Boolean);if(values.some(t=>t.length>30))throw new Error('每个标签请控制在 30 个字符以内。');const all=[...new Set([...draft.tags,...values])];if(all.length>24)throw new Error('每个素材最多添加 24 个标签。');draft.tags=all;$('#detail-tags').value='';renderEditableTags()}
+function renderReferences() { $('#reference-count').textContent=`${draft.references.length} / 8`;$('#reference-list').innerHTML=draft.references.map((ref,index)=>`<div class="reference-item"><img src="${escapeHTML(ref.thumbnail||ref.blob?blobURL(ref.thumbnail||ref.blob):ref.preview||ref.url)}" alt="参考图：${escapeHTML(ref.name)}"><button type="button" class="reference-remove" data-remove-reference="${index}" aria-label="移除参考图 ${escapeHTML(ref.name)}">${icon('x')}</button></div>`).join('')+(draft.references.length<8?`<button type="button" class="reference-add" id="add-reference">${icon('plus')}<span>添加参考图</span></button>`:''); }
 function renderPreview() {
   const el=$('#detail-preview');const source=mediaURL(draft);const preview=previewURL(draft);
-  if((draft.mediaKind||draft.type)==='video'&&source){el.innerHTML=`<video controls playsinline preload="metadata" src="${escapeHTML(source)}" ${preview?`poster="${escapeHTML(preview)}"`:''}></video>`;const video=$('video',el);video.onerror=()=>{el.innerHTML=`<div class="preview-message">${icon('video')}当前浏览器无法预览此视频<p>原文件已保留，可以下载后使用本地播放器打开。</p></div>`};}
+  if((draft.mediaKind||draft.type)==='video'&&source){el.innerHTML=`<video controls controlslist="nodownload" playsinline preload="metadata" src="${escapeHTML(source)}" ${preview?`poster="${escapeHTML(preview)}"`:''}></video>`;const video=$('video',el);video.onerror=()=>{el.innerHTML=`<div class="preview-message">${icon('video')}当前浏览器无法预览此视频<p>原文件已保留，可以下载后使用本地播放器打开。</p></div>`};}
+  else if((draft.mediaKind||draft.type)==='video'&&window.HuoshiBackend.connected){el.innerHTML=(preview?`<img src="${escapeHTML(preview)}" alt="${escapeHTML(draft.title)}">`:`<div class="preview-message">${icon('video')}</div>`)+`<span class="preview-caption">${draft.previewState==='processing'?'视频预览正在生成，稍后自动更新':'暂时无法预览，登录后可下载原文件'}</span>`;}
   else if(preview){el.innerHTML=`<img src="${escapeHTML(preview)}" alt="${escapeHTML(draft.title)}">`;$('img',el).onerror=()=>{el.innerHTML=`<div class="preview-message">${icon('image')}当前浏览器无法预览此图片<p>原文件已保留，你可以下载后查看。</p></div>`};}
   else if(draft.mime==='application/pdf'&&source){el.innerHTML=`<iframe src="${escapeHTML(source)}" title="PDF 文档预览"></iframe>`;}
   else {el.innerHTML=`<div class="preview-message">${icon(draft.type==='project'?'folder':'file')}${escapeHTML(draft.title)}<p>${draft.url?'项目链接已收录，可在右侧打开。':draft.blob?'项目文件已保存，可下载原文件查看。':'添加项目链接或设置封面，让项目一目了然。'}</p></div>`;}
@@ -227,6 +251,7 @@ function openDetail(id) {
   draft={...asset,tags:[...asset.tags],references:[...(asset.references||[])]};
   $('#detail-form').reset();$('#detail-error').textContent='';$('#detail-title').value=draft.title;$('#detail-prompt').value=draft.prompt||'';$('#detail-demo').hidden=!draft.demo;$('#detail-type-icon').innerHTML=icon(typeIcons[draft.type]);$('#detail-dialog-title').textContent=`${typeLabels[draft.type]}详情`;
   const isProject=draft.type==='project';
+  renderProjectPicker();
   $('label[for="detail-title"]').textContent=isProject?'项目标题':'素材标题';
   $('#detail-title').placeholder=isProject?'给项目起一个名字':'给素材起一个名字';
   $('label[for="detail-prompt"]').innerHTML=isProject?'项目详情 <span>PROJECT DETAILS</span>':'创作提示词 <span>PROMPT</span>';
@@ -235,11 +260,11 @@ function openDetail(id) {
   if(isProject)$('#detail-prompt').value=draft.projectDetails ?? ([projectDescription,draft.prompt].filter(Boolean).join('\n\n'));
   $('#delete-current').innerHTML=`${icon('trash')}删除${isProject?'项目':'素材'}`;
   $('#detail-project-link-field').hidden=draft.type!=='project';$('#detail-project-link').value=draft.url||'';$('#visit-project').hidden=!safeLink(draft.url);$('#visit-project').href=safeLink(draft.url)||'#';
-  const meta=[['素材类型',typeLabels[draft.type]],['文件格式',draft.format||'—'],['文件大小',formatBytes(draft.size)],...(draft.width?[['分辨率',`${draft.width} × ${draft.height}`]]:[]),...(draft.duration?[['时长',formatDuration(draft.duration)]]:[]),['添加日期',formatDate(draft.createdAt)],['所在空间',draft.demo?'示例素材':'本地工作区']];
+  const meta=[['素材类型',typeLabels[draft.type]],['文件格式',draft.format||'—'],['文件大小',formatBytes(draft.size)],...(draft.width?[['分辨率',`${draft.width} × ${draft.height}`]]:[]),...(draft.duration?[['时长',formatDuration(draft.duration)]]:[]),['添加日期',formatDate(draft.createdAt)],['所在空间',draft.demo?'示例素材':window.HuoshiBackend.connected?'共享素材库':'本地工作区']];
   $('#detail-metadata').innerHTML=`<dl>${meta.map(([key,value])=>`<div class="meta-row"><dt>${key}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl>`;
-  $('#download-asset').hidden=!mediaURL(draft);$('#choose-cover').hidden=draft.type==='image';renderEditableTags();renderReferences();renderPreview();$('#detail-dialog').showModal();
+  $('#download-asset').hidden=!(draft.downloadURL||mediaURL(draft));$('#choose-cover').hidden=draft.type==='image';renderEditableTags();renderReferences();renderPreview();window.HuoshiAccounts.sync();$('#detail-dialog').showModal();
 }
-function downloadAsset() { if(!draft)return;const source=mediaURL(draft);if(!source)return;const link=document.createElement('a');link.href=source;link.download=draft.fileName||draft.title;document.body.append(link);link.click();link.remove(); }
+async function downloadAsset() { try{await window.HuoshiAccounts.refresh();if(!window.HuoshiAccounts.requireLogin()||!draft)return;const source=draft.downloadURL||mediaURL(draft);if(!source)return;const link=document.createElement('a');link.href=source;link.download=draft.fileName||draft.title;document.body.append(link);link.click();link.remove();}catch{toast('无法确认登录状态，请重新登录。',true);} }
 
 function setSidebar(open, pinned = false) {
   clearTimeout(sidebarTimer);sidebarPinned=open&&pinned;
@@ -267,6 +292,7 @@ function renderSelection() {
 }
 function toggleSelection(id) { if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);renderSelection(); }
 function requestDelete(ids,reason='single') {
+  if(!window.HuoshiAccounts.requireLogin())return;
   if(working||draftBusy)return;if(!storageReady){toast('当前浏览器无法保存删除日志，请刷新后重试。',true);return}
   const records=assets.filter(a=>ids.includes(a.id));if(!records.length){toast('没有可删除的内容');return}
   setSidebar(false);pendingDelete={ids:records.map(a=>a.id),reason};$('#delete-error').textContent='';
@@ -276,19 +302,22 @@ function requestDelete(ids,reason='single') {
   $('#delete-dialog').showModal();
 }
 function deleteAssetsWithLog(ids,reason) {
+  window.HuoshiAccounts.assertLogin();
+  if(window.HuoshiBackend.connected)return window.HuoshiBackend.remove(ids,reason);
   return new Promise((resolve,reject)=>{
-    const tx=db.transaction(['assets','deletionLogs'],'readwrite');const assetStore=tx.objectStore('assets');
+    const tx=db.transaction(['assets','deletionLogs','accounts','authSessions'],'readwrite');const assetStore=tx.objectStore('assets');
     const unique=[...new Set(ids)];let remaining=unique.length;const records=[];let log=null;
     function finalize() {
       if(!records.length)return;
-      log={id:crypto.randomUUID(),deletedAt:Date.now(),action:reason,count:records.length,source:'本地工作区',items:records.map(a=>({id:a.id,type:a.type,title:a.title,tags:[...(a.tags||[])],fileName:a.fileName||'',url:a.url||'',demo:!!a.demo}))};
+      log={id:crypto.randomUUID(),deletedAt:Date.now(),action:reason,count:records.length,source:'本地工作区',actor:window.HuoshiAccounts.user?.phone||'',items:records.map(a=>({id:a.id,type:a.type,title:a.title,tags:[...(a.tags||[])],fileName:a.fileName||'',url:a.url||'',demo:!!a.demo}))};
       tx.objectStore('deletionLogs').add(log);records.forEach(a=>assetStore.delete(a.id));
     }
-    unique.forEach(id=>{const request=assetStore.get(id);request.onsuccess=()=>{if(request.result)records.push(request.result);remaining--;if(remaining===0)finalize()}});
+    accountStore.authorizeTransaction(tx,()=>unique.forEach(id=>{const request=assetStore.get(id);request.onsuccess=()=>{if(request.result)records.push(request.result);remaining--;if(remaining===0)finalize()}}));
     tx.oncomplete=()=>resolve(log);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('删除已取消，内容保持原样。'));
   });
 }
 async function confirmDeletion() {
+  if(!window.HuoshiAccounts.requireLogin())return;
   if(working||!pendingDelete)return;working=true;const target=pendingDelete;
   $('#confirm-delete').disabled=true;$('#confirm-delete').textContent='正在删除…';
   try {
@@ -305,11 +334,12 @@ function renderLogs() {
   const matches=deletionLogs.map(log=>({...log,matched:log.items.filter(item=>(type==='all'||item.type===type)&&[item.title,item.fileName,item.id,log.id,...item.tags].join(' ').toLocaleLowerCase().includes(query))})).filter(log=>log.matched.length);
   $('#logs-count').textContent=matches.reduce((sum,log)=>sum+log.matched.length,0);
   const dateFormat=new Intl.DateTimeFormat('zh-CN',{dateStyle:'medium',timeStyle:'medium',timeZone:'Asia/Shanghai',hour12:false});
-  $('#log-list').innerHTML=matches.length?matches.map(log=>`<section class="log-entry"><div class="log-entry-header"><span class="log-action">${icon('trash')}${{single:'单个删除',bulk:'批量删除',demo_cleanup:'移除示例素材'}[log.action]||'删除'}<small>${log.count} 项</small></span><time datetime="${new Date(log.deletedAt).toISOString()}">${escapeHTML(dateFormat.format(log.deletedAt))}</time></div><ul>${log.matched.map(item=>`<li><span class="log-item-icon">${icon(typeIcons[item.type])}</span><div><strong>${escapeHTML(item.title)}</strong><p>${typeLabels[item.type]}${item.demo?' · 示例':''}${item.fileName?` · ${escapeHTML(item.fileName)}`:''}</p><div class="log-tags">${item.tags.map(tag=>`<span># ${escapeHTML(tag)}</span>`).join('')||'<span>无标签</span>'}</div><small class="log-asset-id">素材编号 ${escapeHTML(item.id)}</small></div></li>`).join('')}</ul><div class="log-entry-footer"><span>本地工作区 · 本次 ${log.count} 项${log.matched.length!==log.count?`，当前匹配 ${log.matched.length} 项`:''}</span><span title="${escapeHTML(log.id)}">记录 ${escapeHTML(log.id.slice(0,8))}</span></div></section>`).join(''):`<div class="logs-empty">${icon('history')}<h3>${deletionLogs.length?'没有匹配的记录':'还没有删除记录'}</h3><p>${deletionLogs.length?'换一个关键词或素材类型试试。':'删除内容后，记录会保留在这里。'}</p></div>`;
+  $('#log-list').innerHTML=matches.length?matches.map(log=>`<section class="log-entry"><div class="log-entry-header"><span class="log-action">${icon('trash')}${{single:'单个删除',bulk:'批量删除',demo_cleanup:'移除示例素材'}[log.action]||'删除'}<small>${log.count} 项</small></span><time datetime="${new Date(log.deletedAt).toISOString()}">${escapeHTML(dateFormat.format(log.deletedAt))}</time></div><ul>${log.matched.map(item=>`<li><span class="log-item-icon">${icon(typeIcons[item.type])}</span><div><strong>${escapeHTML(item.title)}</strong><p>${typeLabels[item.type]}${item.demo?' · 示例':''}${item.fileName?` · ${escapeHTML(item.fileName)}`:''}</p><div class="log-tags">${item.tags.map(tag=>`<span># ${escapeHTML(tag)}</span>`).join('')||'<span>无标签</span>'}</div><small class="log-asset-id">素材编号 ${escapeHTML(item.id)}</small></div></li>`).join('')}</ul><div class="log-entry-footer"><span>${escapeHTML(log.source||'本地工作区')}${log.actor?` · 操作者 ${escapeHTML(log.actor.slice(0,3))}****${escapeHTML(log.actor.slice(-4))}`:''} · 本次 ${log.count} 项${log.matched.length!==log.count?`，当前匹配 ${log.matched.length} 项`:''}</span><span title="${escapeHTML(log.id)}">记录 ${escapeHTML(log.id.slice(0,8))}</span></div></section>`).join(''):`<div class="logs-empty">${icon('history')}<h3>${deletionLogs.length?'没有匹配的记录':'还没有删除记录'}</h3><p>${deletionLogs.length?'换一个关键词或素材类型试试。':'删除内容后，记录会保留在这里。'}</p></div>`;
 }
 async function openLogs() {
+  if(!window.HuoshiAccounts.requireLogin())return;
   if(!storageReady){toast('日志存储暂不可用，请刷新后重试。',true);return}
-  setSidebar(false);try{deletionLogs=(await readStore('deletionLogs')).sort((a,b)=>b.deletedAt-a.deletedAt);$('#log-search').value='';$('#log-type').value='all';renderLogs();$('#logs-dialog').showModal()}catch(err){toast('无法读取日志，请刷新页面后重试。',true)}
+  setSidebar(false);try{deletionLogs=(window.HuoshiBackend.connected?await window.HuoshiBackend.deletionLogs():await readStore('deletionLogs')).sort((a,b)=>b.deletedAt-a.deletedAt);$('#log-search').value='';$('#log-type').value='all';renderLogs();$('#logs-dialog').showModal()}catch(err){toast('无法读取日志，请刷新页面后重试。',true)}
 }
 function bindManagementEvents() {
   const panel=$('#tag-sidebar'),handle=$('#sidebar-toggle');
@@ -325,7 +355,7 @@ function bindManagementEvents() {
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('dialog[open]')&&panel.classList.contains('open')){setSidebar(false);handle.focus()}});
   $('#tag-search').addEventListener('input',e=>{tagQuery=e.target.value;renderTags()});
   $('#reset-visible-filters').addEventListener('click',resetFilters);
-  $('#batch-toggle').addEventListener('click',()=>{selectionMode=!selectionMode;selectedIds.clear();renderSelection()});
+  $('#batch-toggle').addEventListener('click',()=>{if(!window.HuoshiAccounts.requireLogin())return;selectionMode=!selectionMode;selectedIds.clear();renderSelection()});
   $('#batch-cancel').addEventListener('click',()=>{selectionMode=false;selectedIds.clear();renderSelection()});
   $('#select-all').addEventListener('change',e=>{selectedIds.clear();if(e.target.checked)filteredAssets().forEach(a=>selectedIds.add(a.id));renderSelection()});
   $('#asset-grid').addEventListener('change',e=>{if(e.target.matches('[data-select]'))toggleSelection(e.target.dataset.select)});
@@ -342,44 +372,64 @@ function bindEvents() {
   addEventListener('hashchange',()=>{updateRoute();if(route!=='home')window.scrollTo({top:0,behavior:'instant'})});
   $('#search-input').addEventListener('input',e=>{search=e.target.value;render()});
   $('#sort-select').addEventListener('change',e=>{sort=e.target.value;render()});
-  $('#type-tabs').addEventListener('click',e=>{const button=e.target.closest('[data-type]');if(!button)return;filterType=button.dataset.type;filterTag='';render()});
+  $('#type-tabs').addEventListener('click',e=>{const button=e.target.closest('[data-type]');if(!button)return;filterType=button.dataset.type;filterTag='';if(filterType==='project')filterProject='';render()});
+  $('#project-filters').addEventListener('click',e=>{const button=e.target.closest('[data-project]');if(!button)return;filterProject=button.dataset.project;render()});
   $('#tag-filters').addEventListener('click',e=>{const button=e.target.closest('[data-tag]');if(!button)return;filterTag=button.dataset.tag;render()});
   $('#favorite-filter').addEventListener('click',()=>{favoritesOnly=!favoritesOnly;$('#favorite-filter').setAttribute('aria-pressed',favoritesOnly);render()});
   $('#clear-filters').addEventListener('click',resetFilters);
   $('#empty-action').addEventListener('click',()=>$('#empty-action').textContent==='重置筛选'?resetFilters():openUpload());
-  $('#open-upload').addEventListener('click',openUpload);$('#workspace-info').addEventListener('click',()=>$('#info-dialog').showModal());
-  $('#asset-grid').addEventListener('click',async e=>{const remove=e.target.closest('[data-delete]');if(remove){requestDelete([remove.dataset.delete]);return}const tag=e.target.closest('[data-card-tag]');if(tag){filterTag=tag.dataset.cardTag;render();return}const open=e.target.closest('[data-open]');if(open){if(selectionMode)toggleSelection(open.dataset.open);else openDetail(open.dataset.open);return}const button=e.target.closest('[data-favorite]');if(!button)return;const asset=assets.find(a=>a.id===button.dataset.favorite);button.disabled=true;const updated={...asset,favorite:!asset.favorite};try{await saveAssets([updated]);assets=assets.map(a=>a.id===updated.id?updated:a);render();toast(updated.favorite?'已加入收藏':'已取消收藏')}catch(err){button.disabled=false;toast(storageError(err),true)}});
-  document.addEventListener('click',e=>{const close=e.target.closest('[data-close]');if(close&&!working&&!draftBusy)document.getElementById(close.dataset.close).close()});
-  $$('dialog').forEach(dialog=>{dialog.addEventListener('click',e=>{if(e.target===dialog&&!working&&!draftBusy){const rect=dialog.getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)dialog.close()}});dialog.addEventListener('cancel',e=>{if(working||draftBusy)e.preventDefault()})});
+  $('#open-upload').addEventListener('click',openUpload);
+  $('#asset-grid').addEventListener('click',async e=>{const remove=e.target.closest('[data-delete]');if(remove){requestDelete([remove.dataset.delete]);return}const tag=e.target.closest('[data-card-tag]');if(tag){filterTag=tag.dataset.cardTag;render();return}const open=e.target.closest('[data-open]');if(open){if(selectionMode)toggleSelection(open.dataset.open);else openDetail(open.dataset.open);return}const button=e.target.closest('[data-favorite]');if(!button)return;if(!window.HuoshiAccounts.requireLogin())return;const asset=assets.find(a=>a.id===button.dataset.favorite);button.disabled=true;const updated={...asset,favorite:!asset.favorite};try{await saveAssets([updated]);assets=assets.map(a=>a.id===updated.id?updated:a);render();toast(updated.favorite?'已加入收藏':'已取消收藏')}catch(err){button.disabled=false;toast(storageError(err),true)}});
+  document.addEventListener('click',e=>{const close=e.target.closest('[data-close]');if(close&&!working&&!draftBusy&&!window.HuoshiAccounts.busy)document.getElementById(close.dataset.close).close()});
+  $$('dialog').forEach(dialog=>{dialog.addEventListener('click',e=>{if(e.target===dialog&&!working&&!draftBusy&&!window.HuoshiAccounts.busy){const rect=dialog.getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)dialog.close()}});dialog.addEventListener('cancel',e=>{if(working||draftBusy||window.HuoshiAccounts.busy)e.preventDefault()})});
   $('#detail-dialog').addEventListener('close',()=>{$$('#detail-preview video').forEach(v=>v.pause());$('#detail-preview').replaceChildren();draft=null;});
   $('#upload-types').addEventListener('click',e=>{const button=e.target.closest('[data-upload-type]');if(button&&!working)setUploadType(button.dataset.uploadType)});
   $('#choose-files').addEventListener('click',()=>{if(!working)$('#upload-files').click()});
   $('#upload-files').addEventListener('change',e=>{selectFiles([...e.target.files]);e.target.value=''});
   $('#selected-files').addEventListener('click',e=>{const button=e.target.closest('[data-remove-file]');if(button&&!working){selectedFiles.splice(Number(button.dataset.removeFile),1);renderSelectedFiles()}});
   attachDropZone($('#choose-files'),files=>{if(!working)selectFiles(files)});
-  attachDropZone($('#page-drop'),async files=>{if(working||!storageReady)return;working=true;$('#open-upload').disabled=true;$('#upload-button-text').textContent='正在保存…';try{const records=await addFiles(files,routeConfig[route].type);toast(`已添加 ${records.length} 份素材`)}catch(e){toast(e.name==='Error'?e.message:storageError(e),true)}finally{working=false;$('#open-upload').disabled=false;$('#upload-button-text').textContent=routeConfig[route].upload}});
-  $('#upload-form').addEventListener('submit',async e=>{e.preventDefault();if(working)return;const title=$('#project-title').value.trim();const rawURL=$('#project-link').value.trim();const url=safeLink(rawURL);$('#upload-error').textContent='';if(rawURL&&!url){$('#upload-error').textContent='请输入有效的 http 或 https 项目链接。';return}if(!selectedFiles.length&&!(uploadType==='project'&&url)){$('#upload-error').textContent=uploadType==='project'?'请添加项目链接或选择项目文件。':'请先选择要上传的文件。';return}working=true;$('#confirm-upload').disabled=true;$('#confirm-upload').textContent='正在保存…';try{const records=await addFiles(selectedFiles,uploadType,{title,url});$('#upload-dialog').close();toast(`已添加 ${records.length} 份素材，可点击卡片编辑详情`)}catch(err){$('#upload-error').textContent=err.name==='Error'?err.message:storageError(err)}finally{working=false;$('#confirm-upload').disabled=false;$('#confirm-upload').innerHTML=`${icon('plus')}添加到资产库`}});
-  $('#detail-tags').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();try{commitTags();$('#detail-error').textContent=''}catch(err){$('#detail-error').textContent=err.message}}});
-  $('#editable-tags').addEventListener('click',e=>{const button=e.target.closest('[data-remove-tag]');if(button){draft.tags.splice(Number(button.dataset.removeTag),1);renderEditableTags()}});
-  $('#reference-list').addEventListener('click',e=>{if(e.target.closest('#add-reference'))$('#reference-files').click();const remove=e.target.closest('[data-remove-reference]');if(remove){draft.references.splice(Number(remove.dataset.removeReference),1);renderReferences()}});
-  $('#reference-files').addEventListener('change',async e=>{const files=[...e.target.files];e.target.value='';if(!draft||draftBusy)return;draftBusy=true;$('#save-detail').disabled=true;try{if(draft.references.length+files.length>8)throw new Error('最多可添加 8 张参考图。');validateFiles(files,'image');const refs=[];for(const file of files){if(file.size>20*1024*1024)throw new Error('单张参考图请控制在 20 MB 以内。');const meta=await imageMetadata(file);if(!meta.width)throw new Error('参考图无法读取，请使用 JPG、PNG、WebP 等格式。');refs.push({name:file.name,blob:file,thumbnail:meta.thumbnail})}draft.references.push(...refs);renderReferences();$('#detail-error').textContent=''}catch(err){$('#detail-error').textContent=err.message}finally{draftBusy=false;$('#save-detail').disabled=false}});
-  $('#choose-cover').addEventListener('click',()=>$('#cover-file').click());
-  $('#cover-file').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file||!draft||draftBusy)return;draftBusy=true;$('#save-detail').disabled=true;try{validateFiles([file],'image');const meta=await imageMetadata(file);if(!meta.width)throw new Error('封面无法读取，请使用 JPG、PNG 或 WebP 图片。');draft.cover=meta.thumbnail||file;renderPreview();$('#detail-error').textContent=''}catch(err){$('#detail-error').textContent=err.message}finally{draftBusy=false;$('#save-detail').disabled=false}});
-  $('#import-prompt').addEventListener('click',()=>$('#prompt-file').click());
-  $('#prompt-file').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file||!draft)return;draftBusy=true;$('#save-detail').disabled=true;try{if(file.size>2*1024*1024)throw new Error('文本请控制在 2 MB 以内。');$('#detail-prompt').value=await file.text();toast(`${draft.type==='project'?'项目详情':'提示词'}已导入，保存后生效`)}catch(err){$('#detail-error').textContent=err.message}finally{draftBusy=false;$('#save-detail').disabled=false}});
+  attachDropZone($('#page-drop'),async files=>{if(!window.HuoshiAccounts.requireLogin())return;if(working||!storageReady)return;working=true;$('#open-upload').disabled=true;$('#upload-button-text').textContent='正在保存…';try{const records=await addFiles(files,routeConfig[route].type);toast(`已添加 ${records.length} 份素材`)}catch(e){toast(e.name==='Error'?e.message:storageError(e),true)}finally{working=false;$('#open-upload').disabled=false;$('#upload-button-text').textContent=routeConfig[route].upload}});
+  $('#upload-form').addEventListener('submit',async e=>{e.preventDefault();if(!window.HuoshiAccounts.requireLogin())return;if(working)return;const title=$('#project-title').value.trim();const rawURL=$('#project-link').value.trim();const url=safeLink(rawURL);$('#upload-error').textContent='';if(rawURL&&!url){$('#upload-error').textContent='请输入有效的 http 或 https 项目链接。';return}if(!selectedFiles.length&&!(uploadType==='project'&&url)){$('#upload-error').textContent=uploadType==='project'?'请添加项目链接或选择项目文件。':'请先选择要上传的文件。';return}working=true;$('#confirm-upload').disabled=true;$('#confirm-upload').textContent='正在保存…';try{const records=await addFiles(selectedFiles,uploadType,{title,url});$('#upload-dialog').close();toast(`已添加 ${records.length} 份素材，可点击卡片编辑详情`)}catch(err){$('#upload-error').textContent=err.name==='Error'?err.message:storageError(err)}finally{working=false;$('#confirm-upload').disabled=false;$('#confirm-upload').innerHTML=`${icon('plus')}添加到资产库`}});
+  $('#detail-tags').addEventListener('keydown',e=>{if(!window.HuoshiAccounts.requireLogin())return;if(e.key==='Enter'&&!e.isComposing){e.preventDefault();try{commitTags();$('#detail-error').textContent=''}catch(err){$('#detail-error').textContent=err.message}}});
+  $('#editable-tags').addEventListener('click',e=>{if(!window.HuoshiAccounts.requireLogin())return;const button=e.target.closest('[data-remove-tag]');if(button){draft.tags.splice(Number(button.dataset.removeTag),1);renderEditableTags()}});
+  $('#reference-list').addEventListener('click',e=>{if(!window.HuoshiAccounts.requireLogin())return;if(e.target.closest('#add-reference'))$('#reference-files').click();const remove=e.target.closest('[data-remove-reference]');if(remove){draft.references.splice(Number(remove.dataset.removeReference),1);renderReferences()}});
+  $('#reference-files').addEventListener('change',async e=>{if(!window.HuoshiAccounts.requireLogin())return;const files=[...e.target.files];e.target.value='';if(!draft||draftBusy)return;draftBusy=true;$('#save-detail').disabled=true;try{if(draft.references.length+files.length>8)throw new Error('最多可添加 8 张参考图。');validateFiles(files,'image');const refs=[];for(const file of files){if(file.size>20*1024*1024)throw new Error('单张参考图请控制在 20 MB 以内。');const meta=await imageMetadata(file);if(!meta.width)throw new Error('参考图无法读取，请使用 JPG、PNG、WebP 等格式。');refs.push({name:file.name,blob:file,thumbnail:meta.thumbnail})}draft.references.push(...refs);renderReferences();$('#detail-error').textContent=''}catch(err){$('#detail-error').textContent=err.message}finally{draftBusy=false;$('#save-detail').disabled=false}});
+  $('#choose-cover').addEventListener('click',()=>{if(window.HuoshiAccounts.requireLogin())$('#cover-file').click()});
+  $('#cover-file').addEventListener('change',async e=>{if(!window.HuoshiAccounts.requireLogin())return;const file=e.target.files[0];e.target.value='';if(!file||!draft||draftBusy)return;draftBusy=true;$('#save-detail').disabled=true;try{validateFiles([file],'image');const meta=await imageMetadata(file);if(!meta.width)throw new Error('封面无法读取，请使用 JPG、PNG 或 WebP 图片。');draft.cover=meta.thumbnail||file;renderPreview();$('#detail-error').textContent=''}catch(err){$('#detail-error').textContent=err.message}finally{draftBusy=false;$('#save-detail').disabled=false}});
+  $('#import-prompt').addEventListener('click',()=>{if(window.HuoshiAccounts.requireLogin())$('#prompt-file').click()});
+  $('#prompt-file').addEventListener('change',async e=>{if(!window.HuoshiAccounts.requireLogin())return;const file=e.target.files[0];e.target.value='';if(!file||!draft)return;draftBusy=true;$('#save-detail').disabled=true;try{if(file.size>2*1024*1024)throw new Error('文本请控制在 2 MB 以内。');$('#detail-prompt').value=await file.text();toast(`${draft.type==='project'?'项目详情':'提示词'}已导入，保存后生效`)}catch(err){$('#detail-error').textContent=err.message}finally{draftBusy=false;$('#save-detail').disabled=false}});
   $('#copy-prompt').addEventListener('click',async()=>{const value=$('#detail-prompt').value;if(!value){toast(draft?.type==='project'?'先写下一段项目详情吧':'先写下一段提示词吧');return}try{await navigator.clipboard.writeText(value);toast('文本已复制')}catch{$('#detail-prompt').focus();$('#detail-prompt').select();toast('请按 Ctrl+C 或 Command+C 复制选中的文本')}});
   $('#download-asset').addEventListener('click',downloadAsset);
   $('#detail-project-link').addEventListener('input',e=>{const url=safeLink(e.target.value);$('#visit-project').hidden=!url;$('#visit-project').href=url||'#'});
-  $('#detail-form').addEventListener('submit',async e=>{e.preventDefault();if(!draft||working||draftBusy)return;$('#detail-error').textContent='';try{commitTags();const title=$('#detail-title').value.trim();if(!title)throw new Error(draft.type==='project'?'请填写项目标题。':'请填写素材标题。');const rawURL=$('#detail-project-link').value.trim();const url=draft.type==='project'?safeLink(rawURL):'';if(draft.type==='project'&&rawURL&&!url)throw new Error('项目链接必须以 http:// 或 https:// 开头。');if(draft.type==='project'&&!url&&!draft.blob&&!draft.demo)throw new Error('请保留项目链接，或重新上传项目文件。');const content=draft.type==='project'?{projectDetails:$('#detail-prompt').value}:{prompt:$('#detail-prompt').value};const updated={...draft,title,...content,url,updatedAt:Date.now()};working=true;$('#save-detail').disabled=true;$('#save-detail').textContent='正在保存…';await saveAssets([updated]);assets=assets.map(a=>a.id===updated.id?updated:a);$('#detail-dialog').close();render();toast('已保存，灵感已妥善收好')}catch(err){$('#detail-error').textContent=err.name==='Error'?err.message:storageError(err)}finally{working=false;$('#save-detail').disabled=false;$('#save-detail').innerHTML=`${icon('check')}保存修改`}});
+  $('#detail-form').addEventListener('submit',async e=>{e.preventDefault();if(!window.HuoshiAccounts.requireLogin())return;if(!draft||working||draftBusy)return;$('#detail-error').textContent='';try{commitTags();const title=$('#detail-title').value.trim();if(!title)throw new Error(draft.type==='project'?'请填写项目标题。':'请填写素材标题。');const rawURL=$('#detail-project-link').value.trim();const url=draft.type==='project'?safeLink(rawURL):'';if(draft.type==='project'&&rawURL&&!url)throw new Error('项目链接必须以 http:// 或 https:// 开头。');if(draft.type==='project'&&!url&&!draft.blob&&!draft.originalId&&!draft.demo)throw new Error('请保留项目链接，或重新上传项目文件。');const content=draft.type==='project'?{projectDetails:$('#detail-prompt').value}:{prompt:$('#detail-prompt').value};const projectId=draft.type==='project'?'':$('#detail-project').value;if(projectId&&projectId!==draft.projectId&&!assets.some(a=>a.id===projectId&&a.type==='project'))throw new Error('所选项目已不存在，请重新选择。');const updated={...draft,title,...content,url,projectId,updatedAt:Date.now()};working=true;$('#save-detail').disabled=true;$('#save-detail').textContent='正在保存…';await saveAssets([updated]);assets=assets.map(a=>a.id===updated.id?updated:a);$('#detail-dialog').close();render();toast('已保存，灵感已妥善收好')}catch(err){$('#detail-error').textContent=err.name==='Error'?err.message:storageError(err)}finally{working=false;$('#save-detail').disabled=false;$('#save-detail').innerHTML=`${icon('check')}保存修改`}});
   $('#remove-demos').addEventListener('click',()=>requestDelete(assets.filter(a=>a.demo).map(a=>a.id),'demo_cleanup'));
   addEventListener('keydown',e=>{if(route!=='home'&&e.key==='/'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!$('dialog[open]')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();setSidebar(true,true);$('#search-input').focus()}});
   addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault()});addEventListener('drop',e=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault()});
   addEventListener('beforeunload',()=>activeURLs.forEach(url=>URL.revokeObjectURL(url)));
 }
 
+async function refreshSharedAssets() {
+  if(!window.HuoshiBackend.connected||working||draftBusy||document.hidden)return;
+  assets=await window.HuoshiBackend.list();render();
+  if(draft){const latest=assets.find(a=>a.id===draft.id);if(latest&&latest.src!==draft.src){draft.src=latest.src;draft.previewState=latest.previewState;renderPreview();}}
+}
 async function init() {
   hydrateIcons();bindEvents();window.HuoshiHome.init({onOpen:openDetail,previewURL,mediaURL,escapeHTML,icon});
-  try{db=await openDatabase();db.onversionchange=()=>db.close();if(!await readStore('settings','seeded'))await seedDatabase(createSamples());assets=await readStore('assets');storageReady=true;updateRoute();}
-  catch(err){console.error('Asset storage unavailable',err);assets=createSamples();updateRoute();$('#storage-status').textContent='存储不可用';$('#open-upload').disabled=true;toast('当前浏览器无法保存数据，请允许网站存储后刷新。',true);}
+  try{
+    const remote=await window.HuoshiBackend.connect();
+    try{db=await openDatabase();db.onversionchange=()=>{db.close();if(!remote)storageReady=false;toast('网站已更新，请刷新后继续。',true);};}catch(e){if(!remote)throw e;}
+    accountStore=remote||window.createLocalAccountStore(db);await window.HuoshiAccounts.init(accountStore);
+    if(remote){
+      assets=await window.HuoshiBackend.list();
+      $('.workspace-label').innerHTML='<i></i> 团队共享空间';$('#storage-status').textContent='保存在服务器';
+      $('.local-note').textContent='素材将保存到团队服务器，同事可在共享素材库中查看。';
+      $('#info-title').textContent='团队共享空间';$('#info-dialog .dialog-body').innerHTML='<p>账号、素材、标签和操作日志保存在团队服务器，使用同一网址的同事可以共享内容。</p><p>游客可以浏览预览；登录后可上传、下载原文件、编辑和删除。忘记密码请联系管理员。</p><p>公开预览可以被浏览器保存；原文件下载由服务器验证登录。服务器数据需要定期备份。</p><button class="button button-light" id="shared-remove-demos">移除示例素材</button>';
+      $('#shared-remove-demos').addEventListener('click',()=>requestDelete(assets.filter(a=>a.demo).map(a=>a.id),'demo_cleanup'));
+      $('#logs-dialog .logs-note').textContent='保留删除时间、操作者、原始标题、标签及操作批次，记录保存在服务器。';
+      setInterval(()=>refreshSharedAssets().catch(()=>{}),15000);
+      addEventListener('focus',()=>refreshSharedAssets().catch(()=>{}));
+    }else{if(!await readStore('settings','seeded'))await seedDatabase(createSamples());assets=await readStore('assets');}
+    storageReady=true;updateRoute();
+  }catch(err){console.error('Workspace unavailable',err);assets=createSamples();updateRoute();$('#storage-status').textContent='连接不可用';$('#open-upload').disabled=true;toast('无法打开工作区，请检查服务器连接或浏览器存储后刷新。',true);}
 }
 init();
